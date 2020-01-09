@@ -11,7 +11,7 @@ const TABLE_PURCHASE_ORDER_ITEM = 'purchase_order_item'
 let docClient = new AWS.DynamoDB.DocumentClient();
 const pool = new Pool();
 const createPDF = require('./createPDF')
-
+const s3 = new AWS.S3();
 
 exports.handler = async (event, context) => {
     console.log("event => ", event);
@@ -62,9 +62,9 @@ exports.handler = async (event, context) => {
             throw { message: 'poNumber not found.' }
         }
 
-        const {statusCode } = purchaseOrderRes.rows[0];
+        const { statusCode } = purchaseOrderRes.rows[0];
 
-        if(statusCode != 'OPE'){
+        if (statusCode != 'OPE') {
             throw { message: 'cannot get pdf purchase order' }
         }
 
@@ -80,12 +80,20 @@ exports.handler = async (event, context) => {
 
         const createPDFRes = await createPDF.genFilePDFAndUploadPDF(new_purchaseOrderRes)
         console.log('createPDFRes => ', createPDFRes);
-        //set response
-        console.log("set response");
+
+
+        console.log('get Signed Url 180 sec.')
+        const url = await getSignedUrl(createPDFRes.key, 180)
+        console.log('url => ', url)
+
+
+         //set response
+         console.log("set response");
         responsePDF = {
-            fileUrl: createPDFRes.Location || '',
+            fileUrl: url || '',
             key: createPDFRes.key || ''
         }
+
 
     } catch (err) {
         doResponse(context, 401, err)
@@ -107,6 +115,19 @@ exports.handler = async (event, context) => {
     return response;
 };
 
+
+async function getSignedUrl(key, expires) {
+    const param = { Bucket: 'test.import.excel', Key: key, Expires: expires };
+    return new Promise(function (resolve, reject) {
+        s3.getSignedUrl('getObject', param, (err, url) => {
+            if (err) {
+                console.log('getSignedUrl error => ', err)
+                reject(err)
+            }
+            resolve(url);
+        })
+    });
+}
 
 function queryPurchaseOrderWithPoNumber(warehouse, poNumber) {
     const queryText = `select *
