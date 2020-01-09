@@ -60,26 +60,31 @@ exports.handler = async (event, context) => {
 
         if (purchaseOrderRes.rowCount == 0) {
             throw { message: 'poNumber not found.' }
-        } else {
-            // Get PurchaseOrdersItem by user's warehouse and poNumber
-            console.log("query purchase_order_item by poNumber");
-            const paramsPurchaseOrderItem = queryPurchaseOrderItemWithPoNumber(poNumber)
-            let purchaseOrderItemRes = await client.query(paramsPurchaseOrderItem.text, paramsPurchaseOrderItem.value);
-            //set data for pdf
-            console.log('set data for pdf file')
-            new_purchaseOrderRes = purchaseOrderRes.rows[0]
-            new_purchaseOrderRes.items = purchaseOrderItemRes.rows
+        }
+
+        const {statusCode } = purchaseOrderRes.rows[0];
+
+        if(statusCode != 'OPE'){
+            throw { message: 'cannot get pdf purchase order' }
+        }
+
+        // Get PurchaseOrdersItem by user's warehouse and poNumber
+        console.log("query purchase_order_item by poNumber");
+        const paramsPurchaseOrderItem = queryPurchaseOrderItemWithPoNumber(poNumber)
+        let purchaseOrderItemRes = await client.query(paramsPurchaseOrderItem.text, paramsPurchaseOrderItem.value);
+        //set data for pdf
+        console.log('set data for pdf file')
+        new_purchaseOrderRes = purchaseOrderRes.rows[0]
+        new_purchaseOrderRes.items = purchaseOrderItemRes.rows
 
 
-            const createPDFRes = await createPDF.genFilePDFAndUploadPDF(new_purchaseOrderRes)
-            console.log('createPDFRes => ', createPDFRes);
-            //set response
-            console.log("set response");
-            responsePDF = {
-                fileUrl: createPDFRes.Location || '',
-                key: createPDFRes.key || ''
-            }
-
+        const createPDFRes = await createPDF.genFilePDFAndUploadPDF(new_purchaseOrderRes)
+        console.log('createPDFRes => ', createPDFRes);
+        //set response
+        console.log("set response");
+        responsePDF = {
+            fileUrl: createPDFRes.Location || '',
+            key: createPDFRes.key || ''
         }
 
     } catch (err) {
